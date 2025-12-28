@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Classification d'Images ViT</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+   <link rel="stylesheet" href="style.css">
+    <style>
+/* Style inline temporaire pour debug */
+#embeddingMethodsResults {
+    display: block !important;
+    border: 3px dashed #4ECDC4 !important;
+    background: #f8f9fa !important;
+    padding: 20px !important;
+    margin: 20px 0 !important;
+}
+
+.method-section {
+    background: white !important;
+    border: 2px solid #e0e0e0 !important;
+    border-radius: 10px !important;
+    padding: 15px !important;
+    margin: 15px 0 !important;
+}
+
+.method-images-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 10px !important;
+    margin: 15px 0 !important;
+}
+
+.method-image-item {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    border-radius: 5px !important;
+    text-align: center !important;
+}
+
+.method-image-item img {
+    width: 100% !important;
+    height: 80px !important;
+    object-fit: cover !important;
+    border-radius: 3px !important;
+}
+</style>
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-robot"></i>
+                <h1>Vision Transformer (ViT) - Classification d'Images</h1>
+            </div>
+            <p class="subtitle">Système de classification basé sur Vision Transformer pour CIFAR-100. Téléversez une image pour obtenir sa classification et voir les images similaires.</p>
+        </header>
+
+        <!-- Section principale -->
+        <main class="main-content">
+            <!-- Zone de téléchargement d'image -->
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <h3>Déposez votre image ici</h3>
+                    <p>ou cliquez pour parcourir vos fichiers</p>
+                    <p class="file-types">Formats supportés: JPG, PNG, JPEG, GIF</p>
+                    <input type="file" id="imageInput" accept=".jpg,.jpeg,.png,.gif,.bmp" hidden>
+                    <button class="browse-btn" id="browseBtn">
+                        <i class="fas fa-folder-open"></i> Parcourir les fichiers
+                    </button>
+                </div>
+                
+                <!-- Prévisualisation de l'image -->
+                <div class="image-preview" id="imagePreview">
+                    <div class="preview-placeholder">
+                        <i class="fas fa-image"></i>
+                        <p>Aucune image sélectionnée</p>
+                    </div>
+                    <img id="previewImage" alt="Prévisualisation" style="display: none;">
+                </div>
+            </section>
+
+            <!-- Bouton de classification -->
+            <div class="action-section">
+                <button class="classify-btn" id="classifyBtn" disabled>
+                    <i class="fas fa-search"></i> Classifier l'image
+                </button>
+                <button class="reset-btn" id="resetBtn">
+                    <i class="fas fa-redo"></i> Réinitialiser
+                </button>
+            </div>
+
+            <!-- Section des résultats -->
+            <section class="results-section" id="resultsSection">
+                <h2><i class="fas fa-chart-line"></i> Résultats de Classification</h2>
+                
+                <!-- Résultat principal -->
+                <div class="main-result">
+                    <div class="result-card primary">
+                        <h3><i class="fas fa-tag"></i> Classe Prédite</h3>
+                        <div class="predicted-class" id="predictedClass">-</div>
+                        <div class="confidence">
+                            <span>Confiance: </span>
+                            <span class="confidence-value" id="confidenceValue">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 5 prédictions -->
+                <div class="top-predictions">
+                    <h3><i class="fas fa-trophy"></i> Top 5 Prédictions</h3>
+                    <div class="predictions-list" id="predictionsList">
+                        <div class="prediction-item placeholder">
+                            <span class="class-name">En attente de classification...</span>
+                            <span class="class-prob">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Métriques de performance -->
+                <div class="metrics-section">
+                    <h3><i class="fas fa-chart-bar"></i> Métriques de Performance</h3>
+                    
+                    <!-- Conteneur pour les indicateurs de précision -->
+                    <div id="precisionIndicators"></div>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-bullseye"></i>
+                            </div>
+                            <div class="metric-content">
+                                <h4>Précision ViT</h4>
+                                <div class="metric-value" id="vitPrecision">-</div>
+                                <div class="metric-desc">Précision moyenne du modèle</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-stopwatch"></i>
+                            </div>
+                            <div class="metric-content">
+                                <h4>Temps d'inférence</h4>
+                                <div class="metric-value" id="inferenceTime">-</div>
+                                <div class="metric-desc">Temps de classification</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                            <div class="metric-content">
+                                <h4>Taille Embedding</h4>
+                                <div class="metric-value" id="embeddingSize">-</div>
+                                <div class="metric-desc">Dimensions du vecteur</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="metric-content">
+                                <h4>Base de données</h4>
+                                <div class="metric-value" id="databaseSize">-</div>
+                                <div class="metric-desc">Images indexées</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Section de précision dynamique sera ajoutée ici -->
+                </div>
+
+                <!-- Résultats par méthode d'embedding -->
+                <div class="embedding-methods-results" id="embeddingMethodsResults" style="display: none;">
+                    <h3><i class="fas fa-layer-group"></i> Comparaison des Méthodes d'Embedding</h3>
+                    <div class="methods-container" id="methodsContainer">
+                        <!-- Les résultats seront générés dynamiquement ici -->
+                    </div>
+                </div>
+
+                <!-- Images similaires -->
+                <div class="similar-images" id="similarImagesSection">
+                    <h3><i class="fas fa-images"></i> Images Similaires (ViT)</h3>
+                    <div class="similar-images-grid" id="similarImagesGrid">
+                        <div class="similar-image placeholder">
+                            <div style="width: 100%; height: 120px; background: #f0f0f0; border-radius: 8px; margin-bottom: 15px;"></div>
+                            <div class="similarity">-</div>
+                            <div class="image-label">En attente...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Pied de page -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <h4><i class="fas fa-info-circle"></i> À propos du système</h4>
+                    <p>Ce système utilise Vision Transformer (ViT-Base-16-224) pré-entraîné sur ImageNet-21k pour la classification d'images sur le dataset CIFAR-100. La précision est calculée dynamiquement à partir des résultats d'évaluation et des classifications en temps réel.</p>
+                </div>
+                <div class="footer-stats">
+                    <h4><i class="fas fa-chart-pie"></i> Statistiques</h4>
+                    <ul>
+                        <li><span class="stat-label">Classes:</span> <span id="totalClasses">100</span></li>
+                        <li><span class="stat-label">Modèle:</span> ViT-Base-16-224</li>
+                        <li><span class="stat-label">Précision moyenne:</span> <span id="avgPrecision">-</span></li>
+                        <li><span class="stat-label">Dataset:</span> CIFAR-100</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>© 2024 Système de Classification ViT | Développé avec TensorFlow, PyTorch et Flask</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Overlay de chargement -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner">
+                <div class="double-bounce1"></div>
+                <div class="double-bounce2"></div>
+            </div>
+            <h3>Classification en cours...</h3>
+            <p id="loadingMessage">Extraction des caractéristiques avec ViT</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+
+    <!-- Juste avant la balise </body> -->
+<script>
+// Script de debug temporaire
+console.log('🔍 Debug CSS activé');
+
+// Vérifier si les styles CSS sont chargés
+const styleSheets = Array.from(document.styleSheets);
+console.log('Feuilles de style chargées:', styleSheets.length);
+
+// Vérifier la section des méthodes
+setTimeout(() => {
+    const section = document.getElementById('embeddingMethodsResults');
+    const container = document.getElementById('methodsContainer');
+    
+    console.log('📌 État de la section:');
+    console.log('  - Element:', section);
+    console.log('  - Display:', section ? window.getComputedStyle(section).display : 'N/A');
+    console.log('  - Opacity:', section ? window.getComputedStyle(section).opacity : 'N/A');
+    console.log('  - Container:', container);
+    
+    // Ajouter une bordure rouge temporaire pour voir
+    if (section) {
+        section.style.border = '2px solid red';
+        section.style.padding = '20px';
+        section.style.backgroundColor = '#fff';
+    }
+}, 1000);
+</script>
+</body>
+</html>
